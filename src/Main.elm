@@ -5,6 +5,8 @@ import Browser exposing (element)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Input as Input
+import Element.Font as Font
+import Element.Events as Events
 import Http exposing (Error)
 import Element.Input as Input
 import GraphQl
@@ -38,7 +40,8 @@ endPointUrl =
 
 decodeLegoColor : Decoder LegoColor
 decodeLegoColor =
-    Decode.map4 LegoColor
+    Decode.map5 LegoColor
+        (field "id" string)
         (field "name" string)
         (field "blue" int)
         (field "green" int)
@@ -61,7 +64,8 @@ colorsRequest =
         [ GraphQl.field "colors"
             |> GraphQl.withArgument "matching" (GraphQl.variable "matching")
             |> GraphQl.withSelectors
-                [ GraphQl.field "name"
+                [ GraphQl.field "id"
+                , GraphQl.field "name"
                 , GraphQl.field "blue"
                 , GraphQl.field "green"
                 , GraphQl.field "red"
@@ -88,11 +92,13 @@ sendRequest matching msg decoder =
 type alias Model =
     { searchWord : String
     , searchResult : List LegoColor
+    , mouseOverId : String
     }
 
 
 type alias LegoColor =
-    { name : String
+    { id : String
+    , name : String
     , blue : Int
     , green : Int
     , red : Int
@@ -100,12 +106,15 @@ type alias LegoColor =
 
 
 searchWord =
-    "blue"
+    "yellow"
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { searchWord = searchWord, searchResult = [] }
+    ( { searchWord = searchWord
+      , mouseOverId = ""
+      , searchResult = []
+      }
     , sendRequest searchWord GraphQlMsg decodeLegoColorList
     )
 
@@ -117,10 +126,12 @@ init _ =
 type Msg
     = GraphQlMsg (Result Error (List LegoColor))
     | InputText String
+    | MouseEnter String
+    | MouseLeave
 
 
 errorColor =
-    LegoColor "Error" 100 40 210
+    LegoColor "-5" "Error" 100 40 210
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -141,6 +152,16 @@ update msg model =
             , sendRequest string GraphQlMsg decodeLegoColorList
             )
 
+        MouseLeave ->
+            ( { model | mouseOverId = "" }
+            , Cmd.none
+            )
+
+        MouseEnter id ->
+            ( { model | mouseOverId = id }
+            , Cmd.none
+            )
+
 
 
 -- subscriptions
@@ -148,6 +169,54 @@ update msg model =
 
 subscriptions model =
     Sub.none
+
+
+
+-- colors
+
+
+makeGrey float =
+    rgb float float float
+
+
+white =
+    makeGrey 1
+
+
+black =
+    makeGrey 0
+
+
+lightGrey =
+    makeGrey 0.8
+
+
+charcoal =
+    makeGrey 0.1
+
+
+red =
+    rgb 0.5 0.1 0.1
+
+
+
+-- font helper
+
+
+googleFont : String -> Attribute Msg
+googleFont fontName =
+    let
+        fontString =
+            String.replace " " "+" fontName
+    in
+        Font.family
+            [ Font.external
+                { url =
+                    "https://fonts.googleapis.com/css?family="
+                        ++ fontString
+                , name = fontName
+                }
+            ]
 
 
 
@@ -165,14 +234,24 @@ colorView color =
             , width <| px 50
             , height <| px 50
             ]
+
+        rowAttributes =
+            [ spacing 10
+            , width <| px 300
+            , Background.color charcoal
+            , Events.onMouseEnter <| MouseEnter color.id
+            , Events.onMouseLeave MouseLeave
+            , clip
+            ]
     in
-        row [ spacing 10, width <| px 300 ] [ el boxAttributes none, text color.name ]
+        row rowAttributes [ el boxAttributes none, text color.name ]
 
 
 inputBox model label msg =
     el [ padding 10 ] <|
         Input.text
             [ width <| px 250
+            , Font.color black
             ]
             { onChange = (\x -> msg x)
             , text = model.searchWord
@@ -182,18 +261,66 @@ inputBox model label msg =
             }
 
 
+extraView model =
+    let
+        mouseOverColor =
+            model.searchResult
+                |> List.filter (\x -> x.id == model.mouseOverId)
+                |> List.head
+    in
+        case mouseOverColor of
+            Just color ->
+                let
+                    elementColor =
+                        rgb255 color.red color.green color.blue
+
+                    boxAttributes =
+                        [ Background.color elementColor
+                        , width <| px 50
+                        , height <| px 50
+                        ]
+
+                    rowAttributes =
+                        [ spacing 10
+                        , width <| px 600
+                        , Background.color black
+                        ]
+                in
+                    el
+                        [ moveRight 500
+                        , moveDown 30
+                        , height <| px 70
+                        ]
+                    <|
+                        row rowAttributes
+                            [ el boxAttributes none, text color.name ]
+
+            Nothing ->
+                none
+
+
 view : Model -> Html Msg
 view model =
-    layout [] <|
+    layout
+        [ Background.color black
+        , Font.color lightGrey
+        , googleFont "Glegoo"
+        , inFront <| extraView model
+        ]
+    <|
         column
             [ padding 20
             , spacing 10
             ]
         <|
-            inputBox model "Part of color name: " InputText
-                :: [ wrappedRow [ spacing 10 ] <|
-                        List.map colorView model.searchResult
-                   ]
+            [ inputBox model "Part of color name: " InputText
+            , wrappedRow
+                [ spacing 10
+                ]
+                (model.searchResult
+                    |> List.map colorView
+                )
+            ]
 
 
 

@@ -12,7 +12,7 @@
             "elm/http": "1.0.0",
             "elm/json": "1.0.0",
             "ghivert/elm-graphql": "4.0.0",
-            "mdgriffith/elm-ui": "1.0.0"
+            "mdgriffith/elm-ui": "1.1.0"
         },
         "indirect": {
             "elm/time": "1.0.0",

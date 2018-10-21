@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Browser exposing (element)
 import Element exposing (..)
 import Element.Background as Background
+import Element.Input as Input
 import Http exposing (Error)
 import Element.Input as Input
 import GraphQl
@@ -115,6 +116,7 @@ init _ =
 
 type Msg
     = GraphQlMsg (Result Error (List LegoColor))
+    | InputText String
 
 
 errorColor =
@@ -132,6 +134,11 @@ update msg model =
         GraphQlMsg (Err _) ->
             ( { model | searchResult = [ errorColor ] }
             , Cmd.none
+            )
+
+        InputText string ->
+            ( { model | searchWord = string }
+            , sendRequest string GraphQlMsg decodeLegoColorList
             )
 
 
@@ -159,7 +166,20 @@ colorView color =
             , height <| px 50
             ]
     in
-        row [ spacing 10 ] [ el boxAttributes none, text color.name ]
+        row [ spacing 10, width <| px 300 ] [ el boxAttributes none, text color.name ]
+
+
+inputBox model label msg =
+    el [ padding 10 ] <|
+        Input.text
+            [ width <| px 250
+            ]
+            { onChange = (\x -> msg x)
+            , text = model.searchWord
+            , placeholder = Nothing
+            , label =
+                Input.labelLeft [ moveDown 13 ] <| text label
+            }
 
 
 view : Model -> Html Msg
@@ -170,7 +190,10 @@ view model =
             , spacing 10
             ]
         <|
-            List.map colorView model.searchResult
+            inputBox model "Part of color name: " InputText
+                :: [ wrappedRow [ spacing 10 ] <|
+                        List.map colorView model.searchResult
+                   ]
 
 
 

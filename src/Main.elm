@@ -3,6 +3,7 @@ module Main exposing (..)
 import Html exposing (Html)
 import Browser exposing (element)
 import Element exposing (..)
+import Element.Background as Background
 import Http exposing (Error)
 import Element.Input as Input
 import GraphQl
@@ -31,29 +32,6 @@ endPointUrl =
 
 
 
--- model
-
-
-type alias Model =
-    { searchWord : String
-    , searchResult : List LegoColor
-    }
-
-
-type alias LegoColor =
-    { name : String
-    , blue : Int
-    , green : Int
-    , red : Int
-    }
-
-
-init : () -> ( Model, Cmd msg )
-init _ =
-    ( { searchWord = "tan", searchResult = [] }, Cmd.none )
-
-
-
 -- json
 
 
@@ -68,7 +46,8 @@ decodeLegoColor =
 
 decodeLegoColorList : Decoder (List LegoColor)
 decodeLegoColorList =
-    list decodeLegoColor
+    field "colors"
+        (list decodeLegoColor)
 
 
 
@@ -90,7 +69,11 @@ colorsRequest =
         |> GraphQl.withVariables [ ( "matching", "String!" ) ]
 
 
-sendRequest : String -> (Result Http.Error a -> msg) -> Decoder a -> Cmd msg
+sendRequest :
+    String
+    -> (Result Http.Error a -> msg)
+    -> Decoder a
+    -> Cmd msg
 sendRequest matching msg decoder =
     GraphQl.query colorsRequest
         |> GraphQl.addVariables [ ( "matching", Encode.string matching ) ]
@@ -98,16 +81,58 @@ sendRequest matching msg decoder =
 
 
 
+-- model
+
+
+type alias Model =
+    { searchWord : String
+    , searchResult : List LegoColor
+    }
+
+
+type alias LegoColor =
+    { name : String
+    , blue : Int
+    , green : Int
+    , red : Int
+    }
+
+
+searchWord =
+    "blue"
+
+
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { searchWord = searchWord, searchResult = [] }
+    , sendRequest searchWord GraphQlMsg decodeLegoColorList
+    )
+
+
+
 -- update
 
 
 type Msg
-    = GraphQlMsg (Result Error (List Color))
+    = GraphQlMsg (Result Error (List LegoColor))
+
+
+errorColor =
+    LegoColor "Error" 100 40 210
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        GraphQlMsg (Ok result) ->
+            ( { model | searchResult = result }
+            , Cmd.none
+            )
+
+        GraphQlMsg (Err _) ->
+            ( { model | searchResult = [ errorColor ] }
+            , Cmd.none
+            )
 
 
 
@@ -122,10 +147,30 @@ subscriptions model =
 -- view
 
 
-view : Model -> Html msg
+colorView : LegoColor -> Element Msg
+colorView color =
+    let
+        elementColor =
+            rgb255 color.red color.green color.blue
+
+        boxAttributes =
+            [ Background.color elementColor
+            , width <| px 50
+            , height <| px 50
+            ]
+    in
+        row [ spacing 10 ] [ el boxAttributes none, text color.name ]
+
+
+view : Model -> Html Msg
 view model =
     layout [] <|
-        text "Work in progress."
+        column
+            [ padding 20
+            , spacing 10
+            ]
+        <|
+            List.map colorView model.searchResult
 
 
 

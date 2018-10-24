@@ -4,6 +4,7 @@ import Html exposing (Html)
 import Browser exposing (element)
 import Element exposing (..)
 import Element.Background as Background
+import Element.Border as Border
 import Element.Input as Input
 import Element.Font as Font
 import Element.Events as Events
@@ -62,7 +63,9 @@ colorsRequest : Operation Query Variables
 colorsRequest =
     GraphQl.named "query"
         [ GraphQl.field "colors"
-            |> GraphQl.withArgument "matching" (GraphQl.variable "matching")
+            |> GraphQl.withArgument
+                "matching"
+                (GraphQl.variable "matching")
             |> GraphQl.withSelectors
                 [ GraphQl.field "id"
                 , GraphQl.field "name"
@@ -188,11 +191,15 @@ black =
 
 
 lightGrey =
-    makeGrey 0.8
+    makeGrey 0.7
 
 
 charcoal =
     makeGrey 0.1
+
+
+lightCharcoal =
+    makeGrey 0.12
 
 
 red =
@@ -223,28 +230,84 @@ googleFont fontName =
 -- view
 
 
-colorView : LegoColor -> Element Msg
-colorView color =
+box =
+    el
+        [ Background.color red
+        , padding 10
+        , centerX
+        ]
+        none
+
+
+colorView : String -> LegoColor -> Element Msg
+colorView mouseOverId color =
     let
         elementColor =
             rgb255 color.red color.green color.blue
 
+        colorText string getter =
+            let
+                colorString =
+                    color
+                        |> getter
+                        |> String.fromInt
+            in
+                row [ width fill ]
+                    [ text <| string ++ ":  "
+                    , el [ alignRight ] <| text colorString
+                    ]
+
+        belowElement =
+            if color.id == mouseOverId then
+                column
+                    [ Background.color charcoal
+                    , moveLeft 10
+                    , padding 10
+                    , spacing 5
+                    , Border.widthEach
+                        { bottom = 5
+                        , left = 5
+                        , right = 5
+                        , top = 0
+                        }
+                    , Border.color black
+                    ]
+                    [ colorText "Red" .red
+                    , colorText "Green" .green
+                    , colorText "Blue" .blue
+                    ]
+            else
+                none
+
         boxAttributes =
             [ Background.color elementColor
-            , width <| px 50
-            , height <| px 50
+            , width <| px 70
+            , height <| px 70
             ]
 
         rowAttributes =
             [ spacing 10
             , width <| px 300
+            , height <| px 70
             , Background.color charcoal
+            , Border.width 2
+            , Border.color black
+            , mouseOver [ Border.color lightCharcoal ]
             , Events.onMouseEnter <| MouseEnter color.id
             , Events.onMouseLeave MouseLeave
-            , clip
             ]
     in
-        row rowAttributes [ el boxAttributes none, text color.name ]
+        row rowAttributes
+            [ el boxAttributes none
+            , el
+                [ below belowElement
+                , width fill
+                ]
+              <|
+                paragraph
+                    [ padding 5 ]
+                    [ text color.name ]
+            ]
 
 
 inputBox model label msg =
@@ -261,51 +324,12 @@ inputBox model label msg =
             }
 
 
-extraView model =
-    let
-        mouseOverColor =
-            model.searchResult
-                |> List.filter (\x -> x.id == model.mouseOverId)
-                |> List.head
-    in
-        case mouseOverColor of
-            Just color ->
-                let
-                    elementColor =
-                        rgb255 color.red color.green color.blue
-
-                    boxAttributes =
-                        [ Background.color elementColor
-                        , width <| px 50
-                        , height <| px 50
-                        ]
-
-                    rowAttributes =
-                        [ spacing 10
-                        , width <| px 600
-                        , Background.color black
-                        ]
-                in
-                    el
-                        [ moveRight 500
-                        , moveDown 30
-                        , height <| px 70
-                        ]
-                    <|
-                        row rowAttributes
-                            [ el boxAttributes none, text color.name ]
-
-            Nothing ->
-                none
-
-
 view : Model -> Html Msg
 view model =
     layout
         [ Background.color black
         , Font.color lightGrey
-        , googleFont "Glegoo"
-        , inFront <| extraView model
+        , googleFont "Noto Serif"
         ]
     <|
         column
@@ -318,7 +342,7 @@ view model =
                 [ spacing 10
                 ]
                 (model.searchResult
-                    |> List.map colorView
+                    |> List.map (colorView model.mouseOverId)
                 )
             ]
 
